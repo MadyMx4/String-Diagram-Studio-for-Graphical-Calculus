@@ -1,0 +1,30 @@
+\contentsline {section}{\tocsection {}{}{Introduction}}{1}{section*.1}%
+\contentsline {subsection}{\tocsubsection {}{}{Background}}{1}{section*.2}%
+\contentsline {subsection}{\tocsubsection {}{}{Our approach}}{2}{section*.3}%
+\contentsline {subsection}{\tocsubsection {}{}{Acknowledgments}}{4}{section*.4}%
+\contentsline {section}{\tocsection {}{1}{Preliminaries}}{4}{section.1}%
+\contentsline {section}{\tocsection {}{2}{Representations of tensor categories}}{5}{section.2}%
+\contentsline {subsection}{\tocsubsection {}{2.1}{Finite tensor categories}}{5}{subsection.2.1}%
+\contentsline {subsection}{\tocsubsection {}{2.2}{Module categories over tensor categories}}{6}{subsection.2.2}%
+\contentsline {subsection}{\tocsubsection {}{2.3}{The internal Hom}}{9}{subsection.2.3}%
+\contentsline {section}{\tocsection {}{3}{The (co)end for module categories}}{10}{section.3}%
+\contentsline {section}{\tocsection {}{4}{Existence of (co)ends }}{14}{section.4}%
+\contentsline {section}{\tocsection {}{5}{ Hopf algebras in braided tensor categories}}{16}{section.5}%
+\contentsline {subsection}{\tocsubsection {}{5.1}{Hopf algebras in braided tensor categories}}{16}{subsection.5.1}%
+\contentsline {subsection}{\tocsubsection {}{5.2}{Yetter-Drinfeld modules}}{18}{subsection.5.2}%
+\contentsline {section}{\tocsection {}{6}{Monoidal module categories}}{19}{section.6}%
+\contentsline {subsection}{\tocsubsection {}{6.1}{Sections of monoidal functors}}{22}{subsection.6.1}%
+\contentsline {subsection}{\tocsubsection {}{6.2}{Some natural module transformations}}{24}{subsection.6.2}%
+\contentsline {section}{\tocsection {}{7}{Fiber functors and reconstruction results}}{26}{section.7}%
+\contentsline {subsection}{\tocsubsection {}{7.1}{ Coalgebras constructed from a coend}}{26}{subsection.7.1}%
+\contentsline {subsection}{\tocsubsection {}{7.2}{Some auxiliary results}}{30}{subsection.7.2}%
+\contentsline {subsection}{\tocsubsection {}{7.3}{Reconstruction results}}{32}{subsection.7.3}%
+\contentsline {subsection}{\tocsubsection {}{7.4}{Hopf algebras in ${\mathcal C}$ constructed from a coend}}{35}{subsection.7.4}%
+\contentsline {subsection}{\tocsubsection {}{7.5}{The antipode of $H(F)$}}{39}{subsection.7.5}%
+\contentsline {section}{\tocsection {}{8}{Examples and Applications}}{44}{section.8}%
+\contentsline {subsection}{\tocsubsection {}{8.1}{Generic Example}}{44}{subsection.8.1}%
+\contentsline {subsection}{\tocsubsection {}{8.2}{Generic Consequences}}{44}{subsection.8.2}%
+\contentsline {subsection}{\tocsubsection {}{8.3}{Lifting and cocycles deformations}}{45}{subsection.8.3}%
+\contentsline {subsection}{\tocsubsection {}{8.4}{The logarithmic Kazhdan Lusztig conjecture }}{45}{subsection.8.4}%
+\contentsline {section}{\tocsection {}{9}{Questions}}{46}{section.9}%
+\contentsline {section}{\tocsection {}{}{References}}{47}{section*.5}%
