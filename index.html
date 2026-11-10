@@ -856,6 +856,7 @@
     .grid-cell.is-connection-selection-source .point-marker { box-shadow: 0 0 0 5px rgb(200 63 76 / 48%); }
     .diagram-grid.is-placing .grid-cell:not(.occupied) { cursor: copy; }
     .diagram-grid.is-placing .grid-cell:not(.occupied):hover { background: #eaf5f1; }
+    .diagram-grid.is-placing-text .grid-cell:not(.occupied):hover { background: transparent; }
     .connection-selection-port-highlight {
       fill: var(--focus);
       stroke: #fff;
@@ -1357,6 +1358,7 @@
 % All use TikZ's default line caps and joins.
 % Strand commands accept optional TikZ draw options before their coordinates,
 % such as \dLine[line width=1.2pt,dashed,<-,]{x1}{y1}{x2}{y2}{color}.
+\newcommand{\dBull}[3]{\filldraw[draw=#3,fill=#3] (#1,#2) circle[radius=0.09cm];}
 \newcommand{\dLine}[6][line width=1.2pt]{%
   \draw[#1,color=#6] (#2,#3) -- (#4,#5);
 }
@@ -1451,6 +1453,11 @@
     const points = new Set();
     /** @type {Map<number, string>} LaTeX labels belonging to text-node cells. */
     const textNodeValues = new Map();
+    /**
+     * @type {Map<number, {x: number, y: number}>}
+     * Positions for text nodes away from their cell centers.
+     */
+    const textNodePositions = new Map();
     /** @type {Map<number, string>} Non-default colors for bullet cells. */
     const bulletColors = new Map();
     /** @type {DiagramConnection[]} */
@@ -1802,7 +1809,7 @@
         category: "text",
         instructions: selectionModeInstructions,
         hideInstructions: true,
-        announcement: "Click an empty grid cell to place a LaTeX text node"
+        announcement: "Click an empty grid position to place a LaTeX text node at a half-grid step"
       });
     }
 
@@ -1859,6 +1866,7 @@
 
     function updateGridModeClasses() {
       grid.classList.toggle("is-placing", Boolean(activeOperationKey || textNodeMode));
+      grid.classList.toggle("is-placing-text", textNodeMode);
       grid.classList.toggle("is-boxing", boxMode);
       grid.classList.toggle("is-circling", circleMode);
       grid.classList.toggle("is-group-select", groupSelectMode);
@@ -1894,6 +1902,11 @@
           marker.className = "marker";
           if (isTextNode) {
             marker.classList.add("math-marker");
+            const position = endpointFor(index);
+            marker.style.position = "absolute";
+            marker.style.left = `${(position.x - (index % columns)) * 100}%`;
+            marker.style.top = `${(position.y - Math.floor(index / columns)) * 100}%`;
+            marker.style.transform = "translate(-50%, -50%)";
             const value = index === selectedCellIndex && textNodeDraft !== null
               ? textNodeDraft
               : (textNodeValues.get(index) ?? operation.symbol);
@@ -2308,6 +2321,7 @@
           bulletColors.delete(selectedCellIndex);
           cells[selectedCellIndex] = null;
           textNodeValues.delete(selectedCellIndex);
+          textNodePositions.delete(selectedCellIndex);
         }
         for (let index = connections.length - 1; index >= 0; index -= 1) {
           if (connectionUsesNode(connections[index], selectedCellIndex)) {
@@ -2342,6 +2356,7 @@
         cells[index] = null;
         points.delete(index);
         textNodeValues.delete(index);
+        textNodePositions.delete(index);
         bulletColors.delete(index);
       });
       for (let index = boxes.length - 1; index >= 0; index -= 1) {
@@ -2365,6 +2380,7 @@
 
     function endpointFor(index) {
       if (typeof index !== "number") return { x: index.x, y: index.y };
+      if (cells[index] === "text" && textNodePositions.has(index)) return textNodePositions.get(index);
       return { x: (index % columns) + 0.5, y: Math.floor(index / columns) + 0.5 };
     }
 
@@ -2577,7 +2593,7 @@
         const point = latexPoint(index);
         if (operation === "bullet") {
           const latexColor = diagramColors[bulletColors.get(index) || "black"].latex;
-          code.push(`  \\filldraw[draw=${latexColor},fill=${latexColor}] ${latexCoordinate(point)} circle[radius=0.09cm];`);
+          code.push(`  \\dBull{${latexNumber(point.x)}}{${latexNumber(point.y)}}{${latexColor}}`);
         } else if (operation === "text") {
           const text = textNodeValues.get(index) ?? "";
           if (text.trim()) {
@@ -2875,6 +2891,7 @@
         cells: [...cells],
         points: [...points],
         textNodes: [...textNodeValues.entries()],
+        textNodePositions: [...textNodePositions.entries()],
         bulletColors: [...bulletColors.entries()],
         connections: connections.map((connection) => connection.kind === "multiplication"
           ? { ...connection, sources: [...connection.sources] }
@@ -2892,6 +2909,8 @@
       state.points.forEach((index) => points.add(index));
       textNodeValues.clear();
       state.textNodes.forEach(([index, text]) => textNodeValues.set(index, text));
+      textNodePositions.clear();
+      state.textNodePositions.forEach(([index, position]) => textNodePositions.set(index, position));
       bulletColors.clear();
       state.bulletColors.forEach(([index, color]) => bulletColors.set(index, color));
       connections.splice(0, connections.length, ...state.connections);
@@ -2925,6 +2944,10 @@
       });
       const remappedPoints = [...points].map(remapCell);
       const remappedTextNodes = [...textNodeValues].map(([index, text]) => [remapCell(index), text]);
+      const remappedTextNodePositions = [...textNodePositions].map(([index, position]) => [
+        remapCell(index),
+        { ...position, [axis]: position[axis] + coordinateOffset }
+      ]);
       const remappedBulletColors = [...bulletColors].map(([index, color]) => [remapCell(index), color]);
       const remappedGroupSelectedCells = [...groupSelectedCells].map(remapCell);
       const remappedGroupSelectedEndpoints = [...groupSelectedEndpoints.values()].map(remapEndpoint);
@@ -2944,6 +2967,8 @@
       remappedPoints.forEach((index) => points.add(index));
       textNodeValues.clear();
       remappedTextNodes.forEach(([index, text]) => textNodeValues.set(index, text));
+      textNodePositions.clear();
+      remappedTextNodePositions.forEach(([index, position]) => textNodePositions.set(index, position));
       bulletColors.clear();
       remappedBulletColors.forEach(([index, color]) => bulletColors.set(index, color));
       groupSelectedCells.clear();
@@ -3051,6 +3076,10 @@
       });
       const trimmedPoints = [...points].map(remapCell);
       const trimmedTextNodes = [...textNodeValues].map(([index, text]) => [remapCell(index), text]);
+      const trimmedTextNodePositions = [...textNodePositions].map(([index, position]) => [
+        remapCell(index),
+        { x: position.x - bounds.left, y: position.y - bounds.top }
+      ]);
       const trimmedBulletColors = [...bulletColors].map(([index, color]) => [remapCell(index), color]);
 
       connections.forEach((connection) => mapConnectionEndpoints(connection, remapEndpoint));
@@ -3069,6 +3098,8 @@
       trimmedPoints.forEach((index) => points.add(index));
       textNodeValues.clear();
       trimmedTextNodes.forEach(([index, text]) => textNodeValues.set(index, text));
+      textNodePositions.clear();
+      trimmedTextNodePositions.forEach(([index, position]) => textNodePositions.set(index, position));
       bulletColors.clear();
       trimmedBulletColors.forEach(([index, color]) => bulletColors.set(index, color));
       setDefaultMode();
@@ -3107,6 +3138,11 @@
         if (!type) return;
         const node = { cell, type };
         if (type === "text") node.label = savedTextNodes.get(cell) ?? "";
+        if (type === "text" && textNodePositions.has(cell)) {
+          const position = textNodePositions.get(cell);
+          node.x = position.x;
+          node.y = position.y;
+        }
         if (type === "bullet" && bulletColors.has(cell)) node.color = bulletColors.get(cell);
         nodes.push(node);
       });
@@ -3195,6 +3231,7 @@
       const savedCells = Array(cellCount).fill(null);
       const savedPoints = new Set();
       const savedTextNodes = new Map();
+      const savedTextNodePositions = new Map();
       const savedBulletColors = new Map();
       if (data.version === 1) {
         if (!Array.isArray(data.cells) || data.cells.length !== cellCount) {
@@ -3247,6 +3284,17 @@
           if (node.type === "text") {
             if (typeof node.label !== "string" || node.label.length > 256) fail("A text-node label is invalid or too long.");
             savedTextNodes.set(index, node.label);
+            if (node.x !== undefined || node.y !== undefined) {
+              const column = index % savedColumns;
+              const row = Math.floor(index / savedColumns);
+              if (!isHalfStep(node.x) || !isHalfStep(node.y) ||
+                !within(node.x, savedColumns) || !within(node.y, savedRows) ||
+                node.x < column - 0.001 || node.x > column + 1 + 0.001 ||
+                node.y < row - 0.001 || node.y > row + 1 + 0.001) {
+                fail("A text node has invalid coordinates.");
+              }
+              savedTextNodePositions.set(index, { x: node.x, y: node.y });
+            }
           }
           if (node.type === "bullet" && node.color !== undefined) {
             if (!isColor(node.color)) fail("A bullet has an unsupported color.");
@@ -3294,7 +3342,6 @@
       });
       const boxesById = new Map(savedBoxes.map((box) => [box.id, box]));
       const circlesById = new Map(savedCircles.map((circle) => [circle.id, circle]));
-      const isOnHalfStep = (value) => Math.abs(value * 2 - Math.round(value * 2)) < 0.001;
       const validateEndpoint = (endpoint) => {
         if (isInteger(endpoint)) {
           validateCellIndex(endpoint);
@@ -3306,7 +3353,7 @@
         }
         if (isInteger(endpoint.boxId) && !Object.prototype.hasOwnProperty.call(endpoint, "circleId")) {
           const box = boxesById.get(endpoint.boxId);
-          if (!box || !isOnHalfStep(endpoint.x) || !isOnHalfStep(endpoint.y) ||
+          if (!box || !isHalfStep(endpoint.x) || !isHalfStep(endpoint.y) ||
             endpoint.x < box.x - 0.001 || endpoint.x > box.x + box.width + 0.001 ||
             endpoint.y < box.y - 0.001 || endpoint.y > box.y + box.height + 0.001 ||
             Math.min(Math.abs(endpoint.x - box.x), Math.abs(endpoint.x - box.x - box.width),
@@ -3333,9 +3380,13 @@
         }
         fail("A connection endpoint has an unknown shape type.");
       };
-      const endpointPositionInSavedDiagram = (endpoint) => typeof endpoint === "number"
-        ? { x: endpoint % savedColumns + 0.5, y: Math.floor(endpoint / savedColumns) + 0.5 }
-        : { x: endpoint.x, y: endpoint.y };
+      const endpointPositionInSavedDiagram = (endpoint) => {
+        if (typeof endpoint !== "number") return { x: endpoint.x, y: endpoint.y };
+        return savedTextNodePositions.get(endpoint) ?? {
+          x: endpoint % savedColumns + 0.5,
+          y: Math.floor(endpoint / savedColumns) + 0.5
+        };
+      };
 
       if (!Array.isArray(data.connections) || data.connections.length > 100000) fail("The connection data is invalid or too large.");
       const savedConnections = data.connections.map((connection) => {
@@ -3384,6 +3435,7 @@
         cells: savedCells,
         points: savedPoints,
         textNodes: savedTextNodes,
+        textNodePositions: savedTextNodePositions,
         bulletColors: savedBulletColors,
         connections: savedConnections,
         boxes: savedBoxes,
@@ -3401,6 +3453,8 @@
       state.points.forEach((index) => points.add(index));
       textNodeValues.clear();
       state.textNodes.forEach((text, index) => textNodeValues.set(index, text));
+      textNodePositions.clear();
+      state.textNodePositions.forEach((position, index) => textNodePositions.set(index, position));
       bulletColors.clear();
       state.bulletColors.forEach((color, index) => bulletColors.set(index, color));
       connections.length = 0;
@@ -3507,16 +3561,34 @@
       return { cellIndices, boxIds, circleIds };
     }
 
+    function isTextOnlySelection(selection) {
+      return selection.cellIndices.size > 0 &&
+        [...selection.cellIndices].every((index) => cells[index] === "text") &&
+        selection.boxIds.size === 0 && selection.circleIds.size === 0;
+    }
+
     function moveStepForSelection(selection = getMoveSelection()) {
-      return selection.boxIds.size > 0 && selection.cellIndices.size === 0 && selection.circleIds.size === 0
-        ? 0.5
-        : 1;
+      const boxOnlySelection = selection.boxIds.size > 0 &&
+        selection.cellIndices.size === 0 && selection.circleIds.size === 0;
+      return isTextOnlySelection(selection) || boxOnlySelection ? 0.5 : 1;
     }
 
     function cellIndexAfterMove(index, dx, dy) {
       const column = index % columns;
       const row = Math.floor(index / columns);
       return (row + dy) * columns + column + dx;
+    }
+
+    function textPositionAfterMove(index, dx, dy) {
+      const position = endpointFor(index);
+      return { x: position.x + dx, y: position.y + dy };
+    }
+
+    // Text nodes keep a cell index for selection even when their position is on an edge.
+    function cellIndexForTextPosition(position) {
+      const column = Math.min(columns - 1, Math.max(0, Math.floor(position.x)));
+      const row = Math.min(rows - 1, Math.max(0, Math.floor(position.y)));
+      return row * columns + column;
     }
 
     function endpointWillMove(endpoint, selection) {
@@ -3535,12 +3607,24 @@
     function canMoveSelectedNodes(dx, dy, selection = getMoveSelection()) {
       if (!selection.cellIndices.size && !selection.boxIds.size && !selection.circleIds.size) return false;
 
-      for (const index of selection.cellIndices) {
-        const column = index % columns + dx;
-        const row = Math.floor(index / columns) + dy;
-        if (column < 0 || column >= columns || row < 0 || row >= rows) return false;
-        const destination = row * columns + column;
-        if (hasNode(destination) && !selection.cellIndices.has(destination)) return false;
+      if (isTextOnlySelection(selection)) {
+        const destinationCells = new Set();
+        for (const index of selection.cellIndices) {
+          const position = textPositionAfterMove(index, dx, dy);
+          if (position.x < 0 || position.x > columns || position.y < 0 || position.y > rows) return false;
+          const destination = cellIndexForTextPosition(position);
+          if (destinationCells.has(destination) ||
+            (hasNode(destination) && !selection.cellIndices.has(destination))) return false;
+          destinationCells.add(destination);
+        }
+      } else {
+        for (const index of selection.cellIndices) {
+          const column = index % columns + dx;
+          const row = Math.floor(index / columns) + dy;
+          if (column < 0 || column >= columns || row < 0 || row >= rows) return false;
+          const destination = row * columns + column;
+          if (hasNode(destination) && !selection.cellIndices.has(destination)) return false;
+        }
       }
 
       for (const boxId of selection.boxIds) {
@@ -3588,9 +3672,14 @@
       if (!canMoveSelectedNodes(dx, dy, selection)) return;
 
       snapshot();
-      const moveCellIndex = (index) => selection.cellIndices.has(index)
-        ? cellIndexAfterMove(index, dx, dy)
-        : index;
+      const moveTextByHalfTile = isTextOnlySelection(selection);
+      const movedCellIndices = new Map([...selection.cellIndices].map((index) => [
+        index,
+        moveTextByHalfTile
+          ? cellIndexForTextPosition(textPositionAfterMove(index, dx, dy))
+          : cellIndexAfterMove(index, dx, dy)
+      ]));
+      const moveCellIndex = (index) => movedCellIndices.get(index) ?? index;
       const moveEndpoint = (endpoint) => {
         if (typeof endpoint === "number") return moveCellIndex(endpoint);
         if (endpoint.boxId !== undefined && selection.boxIds.has(endpoint.boxId)) {
@@ -3601,6 +3690,25 @@
         }
         return endpoint;
       };
+      const movedTextNodePositions = new Map([...textNodePositions].map(([index, position]) => [
+        moveCellIndex(index),
+        selection.cellIndices.has(index) ? { x: position.x + dx, y: position.y + dy } : position
+      ]));
+      if (moveTextByHalfTile) {
+        selection.cellIndices.forEach((index) => {
+          const destination = moveCellIndex(index);
+          const position = textPositionAfterMove(index, dx, dy);
+          const cellCenter = {
+            x: destination % columns + 0.5,
+            y: Math.floor(destination / columns) + 0.5
+          };
+          if (position.x === cellCenter.x && position.y === cellCenter.y) {
+            movedTextNodePositions.delete(destination);
+          } else {
+            movedTextNodePositions.set(destination, position);
+          }
+        });
+      }
 
       const movedCells = Array(cells.length).fill(null);
       cells.forEach((operation, index) => {
@@ -3616,6 +3724,8 @@
       const movedTextNodes = moveMapKeys(textNodeValues);
       textNodeValues.clear();
       movedTextNodes.forEach(([index, value]) => textNodeValues.set(index, value));
+      textNodePositions.clear();
+      movedTextNodePositions.forEach((position, index) => textNodePositions.set(index, position));
       const movedBulletColors = moveMapKeys(bulletColors);
       bulletColors.clear();
       movedBulletColors.forEach(([index, value]) => bulletColors.set(index, value));
@@ -4231,15 +4341,34 @@
           announce("Cell already contains a node");
           return;
         }
-        if (boxes.some((box) => point.x >= box.x && point.x <= box.x + box.width && point.y >= box.y && point.y <= box.y + box.height)) {
+        const snappedPoint = gridPointAt(event.clientX, event.clientY);
+        const overlapsNode = cells.some((operation, existingIndex) => {
+          if (!operation) return false;
+          const position = endpointFor(existingIndex);
+          return position.x === snappedPoint.x && position.y === snappedPoint.y;
+        }) || [...points].some((existingIndex) => {
+          const position = endpointFor(existingIndex);
+          return position.x === snappedPoint.x && position.y === snappedPoint.y;
+        });
+        if (overlapsNode) {
+          announce("That grid position already contains a node");
+          return;
+        }
+        if (boxes.some((box) => snappedPoint.x >= box.x && snappedPoint.x <= box.x + box.width &&
+          snappedPoint.y >= box.y && snappedPoint.y <= box.y + box.height)) {
           announce("Nodes cannot be placed inside a box");
           return;
         }
         snapshot();
         cells[index] = "text";
         textNodeValues.set(index, "");
+        const cellColumn = index % columns;
+        const cellRow = Math.floor(index / columns);
+        if (snappedPoint.x !== cellColumn + 0.5 || snappedPoint.y !== cellRow + 0.5) {
+          textNodePositions.set(index, snappedPoint);
+        }
         selectedCellIndex = index;
-        announce("Text node placed; enter its LaTeX expression or click another empty tile to place another");
+        announce("Text node placed; enter its LaTeX expression or click another grid position to place another");
         renderGrid();
         return;
       }
@@ -4306,6 +4435,7 @@
       cells.fill(null);
       points.clear();
       textNodeValues.clear();
+      textNodePositions.clear();
       bulletColors.clear();
       connections.length = 0;
       boxes.length = 0;
